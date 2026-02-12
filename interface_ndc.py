@@ -106,9 +106,13 @@ if st.session_state.page == "accueil":
 # =====================================================
 # PAGE 1 : TENDANCE SANS ACTION
 # =====================================================
+
 elif st.session_state.page == "tendance":
 
-    st.button("⬅️ Retour à l'accueil", on_click=lambda: st.session_state.update({"page": "accueil"}))
+    st.button(
+        "⬅️ Retour à l'accueil",
+        on_click=lambda: st.session_state.update({"page": "accueil"})
+    )
 
     st.title("📈 Tendance des émissions — Sans action")
 
@@ -118,28 +122,102 @@ elif st.session_state.page == "tendance":
     secteurs = sorted(df["Sector"].dropna().unique())
     gazs = sorted(df["Gas"].dropna().unique())
 
+    # ➜ Ajouter option All GHG
+    gazs_with_all = ["All GHG"] + gazs
+
+    # =============================
+    # SIDEBAR
+    # =============================
     with st.sidebar:
         st.header("Filtres")
-        reg = st.multiselect("Régions", regions, default=regions[:2] if len(regions) >= 2 else regions)
-        sec = st.multiselect("Secteurs", secteurs, default=secteurs[:1] if len(secteurs) >= 1 else secteurs)
-        gaz = st.multiselect("Gaz", gazs, default=gazs[:1] if len(gazs) >= 1 else gazs)
 
+        reg = st.multiselect(
+            "Régions",
+            regions,
+            default=regions[:2] if len(regions) >= 2 else regions
+        )
+
+        sec = st.multiselect(
+            "Secteurs",
+            secteurs,
+            default=secteurs[:1] if len(secteurs) >= 1 else secteurs
+        )
+
+        gaz = st.multiselect(
+            "Gaz",
+            gazs_with_all,
+            default=["All GHG"]
+        )
+
+    # Sécurité minimale
+    if not reg or not sec or not gaz:
+        st.warning("Veuillez sélectionner au moins une région, un secteur et un gaz.")
+        st.stop()
+
+    # =============================
+    # FILTRAGE BASE (sans gaz)
+    # =============================
     df_f = df[
         df["region"].isin(reg) &
-        df["Sector"].isin(sec) &
-        df["Gas"].isin(gaz)
+        df["Sector"].isin(sec)
     ]
 
-    df_ag = df_f.groupby(["region", "Sector", "Gas"])[annees].sum().reset_index()
+    df_list = []
 
+    # =============================
+    # 1️⃣ CAS ALL GHG
+    # =============================
+    if "All GHG" in gaz:
+
+        df_all = (
+            df_f.groupby(["region", "Sector"])[annees]
+            .sum()
+            .reset_index()
+        )
+
+        df_all["Gas"] = "All GHG"
+
+        df_list.append(df_all)
+
+    # =============================
+    # 2️⃣ GAZ SPÉCIFIQUES
+    # =============================
+    gaz_specifiques = [g for g in gaz if g != "All GHG"]
+
+    if gaz_specifiques:
+
+        df_spec = df_f[df_f["Gas"].isin(gaz_specifiques)]
+
+        df_spec = (
+            df_spec.groupby(["region", "Sector", "Gas"])[annees]
+            .sum()
+            .reset_index()
+        )
+
+        df_list.append(df_spec)
+
+    # Combiner les résultats
+    if df_list:
+        df_ag = pd.concat(df_list, ignore_index=True)
+    else:
+        st.warning("Aucune donnée disponible.")
+        st.stop()
+
+    # =============================
+    # GRAPHIQUE
+    # =============================
     fig = go.Figure()
 
     for _, row in df_ag.iterrows():
+
+        line_width = 4 if row["Gas"] == "All GHG" else 2
+
         fig.add_trace(go.Scatter(
             x=[int(a) for a in annees],
             y=[row[a] for a in annees],
             mode="lines+markers",
-            name=f"{row['region']} | {row['Sector']} | {row['Gas']}"
+            name=f"{row['region']} | {row['Sector']} | {row['Gas']}",
+            line=dict(width=line_width)
         ))
 
     fig.update_layout(
@@ -147,10 +225,12 @@ elif st.session_state.page == "tendance":
         xaxis_title="Année",
         yaxis_title="MtCO₂e",
         template="plotly_white",
-        height=650
+        height=650,
+        legend_title="Région | Secteur | Gaz"
     )
 
     st.plotly_chart(fig, use_container_width=True)
+
 
 
 # =====================================================
