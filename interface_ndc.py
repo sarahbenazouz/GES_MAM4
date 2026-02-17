@@ -236,40 +236,157 @@ elif st.session_state.page == "tendance":
 # =====================================================
 # PAGE 2 : OBJECTIF 1.5 °C
 # =====================================================
+
 elif st.session_state.page == "objectif":
 
-    st.button("⬅️ Retour à l'accueil", on_click=lambda: st.session_state.update({"page": "accueil"}))
+    st.button(
+        "⬅️ Retour à l'accueil",
+        on_click=lambda: st.session_state.update({"page": "accueil"})
+    )
 
-    st.title("🌡️ Trajectoire compatible avec l'objectif 1,5 °C")
+    st.title("🌡️ Objectif 1.5°C - Simulation interactive")
 
-    df, annees = load_sheet_2()
+    # ---- Chargement des données
+    df = pd.read_excel("projections.xlsx", sheet_name="proj 1,5_inter")
+    df.columns = df.columns.str.strip()
 
+    # Colonnes années
+    annees = sorted(
+        [c for c in df.columns if str(c).isdigit()],
+        key=int
+    )
+
+    regions = sorted(df["région"].dropna().unique())
+    secteurs = sorted(df["Sector"].dropna().unique())
+    gazs = sorted(df["Gas"].dropna().unique())
+
+    # =============================
+    # SIDEBAR
+    # =============================
+    with st.sidebar:
+        st.header("Paramètres scénario 1.5°C")
+
+        reg = st.multiselect("Régions", regions, default=regions)
+        sec = st.multiselect("Secteurs", secteurs, default=[secteurs[0]])
+        gaz = st.multiselect("Gaz", gazs, default=[gazs[0]])
+
+        st.markdown("### Paramètres par région")
+
+        params_regions = {}
+
+        for r in reg:
+            st.markdown("---")
+            st.markdown(f"**{r}**")
+
+            annee_r = st.slider(
+                f"Année d'application - {r}",
+                2020, 2050, 2030,
+                key=f"annee_{r}"
+            )
+
+            taux_r = st.number_input(
+                f"Taux annuel (%) - {r}",
+                min_value=-20.0,
+                max_value=20.0,
+                value=-2.0,
+                step=0.1,
+                key=f"taux_{r}"
+            )
+
+            params_regions[r] = {
+                "annee": annee_r,
+                "taux": taux_r / 100
+            }
+
+    if not reg or not sec or not gaz:
+        st.warning("Sélectionnez au moins une région, un secteur et un gaz.")
+        st.stop()
+
+    # =============================
+    # FILTRAGE
+    # =============================
+    df_f = df[
+        df["région"].isin(reg) &
+        df["Sector"].isin(sec) &
+        df["Gas"].isin(gaz)
+    ]
+
+    if df_f.empty:
+        st.warning("Aucune donnée trouvée.")
+        st.stop()
+
+    # =============================
+    # GRAPHIQUE
+    # =============================
     fig = go.Figure()
 
-    for _, row in df.iterrows():
+    for _, row in df_f.iterrows():
+
+        region_row = row["région"]
+
+        # --- TCAM 2010-2019
+        val_2010 = row["2010"]
+        val_2019 = row["2019"]
+
+        if val_2010 == 0:
+            continue
+
+        tcam = ((val_2019 / val_2010) ** (1/9)) - 1
+
+        emissions = row[annees]
+
+        derniere_valeur = emissions.iloc[-1]
+        derniere_annee = int(annees[-1])
+
+        annees_proj = list(range(derniere_annee + 1, 2101))
+
+        valeur = derniere_valeur
+        proj_vals = []
+
+        # Paramètres propres à la région
+        annee_changement = params_regions[region_row]["annee"]
+        nouveau_taux = params_regions[region_row]["taux"]
+
+        for an in annees_proj:
+            if an < annee_changement:
+                taux = tcam
+            else:
+                taux = nouveau_taux
+
+            valeur = valeur * (1 + taux)
+            proj_vals.append(valeur)
+
+        # Historique
         fig.add_trace(go.Scatter(
             x=[int(a) for a in annees],
-            y=[row[a] for a in annees],
-            mode="lines+markers",
-            name=row["Country"]
+            y=emissions.values,
+            mode="lines",
+            name=f"{region_row} | {row['Sector']} | {row['Gas']} (hist)"
+        ))
+
+        # Projection
+        fig.add_trace(go.Scatter(
+            x=annees_proj,
+            y=proj_vals,
+            mode="lines",
+            line=dict(dash="dash"),
+            name=f"{region_row} | {row['Sector']} | {row['Gas']} (proj)"
         ))
 
     fig.update_layout(
-        title="Évolution des émissions — scénario 1,5 °C",
+        title="Projection Objectif 1.5°C — Paramètres personnalisés par région",
         xaxis_title="Année",
         yaxis_title="MtCO₂e",
         template="plotly_white",
-        height=650
+        height=700
     )
+
+    fig.update_yaxes(rangemode="tozero")
 
     st.plotly_chart(fig, use_container_width=True)
 
-    with st.expander("ℹ️ Méthodologie"):
-        st.write("""
-        Cette trajectoire représente une évolution compatible avec l'objectif
-        de limitation du réchauffement climatique à **1,5 °C**.
-        Les courbes correspondent aux grands ensembles régionaux.
-        """)
+
+
 
 
 # =====================================================
