@@ -14,8 +14,8 @@ if "page" not in st.session_state:
 # FONCTIONS DE CHARGEMENT
 # =====================================================
 @st.cache_data
-def load_sheet_0():
-    df = pd.read_excel("projections.xlsx", sheet_name=0)
+def load_tendance():
+    df = pd.read_excel("projections.xlsx", sheet_name="tendance")
     
     # Identifier les colonnes années
     annees = sorted(
@@ -26,8 +26,8 @@ def load_sheet_0():
 
 
 @st.cache_data
-def load_sheet_2():
-    df = pd.read_excel("projections.xlsx", sheet_name=2)
+def load_proj_15_inter():
+    df = pd.read_excel("projections.xlsx", sheet_name="proj 1,5_inter")
 
     # Colonnes années
     annees = sorted(
@@ -47,6 +47,40 @@ def load_sheet_2():
 
     return df, annees
 
+@st.cache_data
+def load_proj_15():
+    df = pd.read_excel("projections.xlsx", sheet_name="proj 1,5")
+
+    # Colonnes années
+    annees = sorted(
+        [c for c in df.columns if isinstance(c, int) or (isinstance(c, str) and c.isdigit())],
+        key=lambda x: int(x)
+    )
+
+    # Conversion virgule → point si nécessaire
+    for col in annees:
+        if df[col].dtype == object:
+            df[col] = (
+                df[col]
+                .astype(str)
+                .str.replace(",", ".", regex=False)
+                .astype(float)
+            )
+
+    return df, annees
+
+@st.cache_data
+def load_tendance_1_5():
+    df = pd.read_excel("projections.xlsx", sheet_name="tendance region1.5")
+
+    # Nettoyer la colonne région : supprimer les NaN et normaliser
+    df["région"] = df["région"].astype(str).str.strip()
+    df = df[df["région"] != "nan"]  # enlever les lignes sans région
+
+    # Colonnes années = colonnes numériques
+    annees = [col for col in df.columns if str(col).isdigit()]
+
+    return df, annees
 
 @st.cache_data
 def load_ndc():
@@ -116,7 +150,7 @@ elif st.session_state.page == "tendance":
 
     st.title("📈 Tendance des émissions — Sans action")
 
-    df, annees = load_sheet_0()
+    df, annees = load_tendance()
 
     regions = sorted(df["region"].dropna().unique())
     secteurs = sorted(df["Sector"].dropna().unique())
@@ -234,8 +268,9 @@ elif st.session_state.page == "tendance":
 
 
 # =====================================================
-# PAGE 2 : OBJECTIF 1.5 °C
+# PAGE 2 : OBJECTIF 1.5 °C vs tendance sans action
 # =====================================================
+
 
 elif st.session_state.page == "objectif":
 
@@ -244,11 +279,11 @@ elif st.session_state.page == "objectif":
         on_click=lambda: st.session_state.update({"page": "accueil"})
     )
 
-    st.title("🌡️ Objectif 1.5°C - Simulation interactive")
+    st.title("🌡️ Objectif 1.5°C - vs Tendance sans action")
 
     # ---- Chargement des données
-    df = pd.read_excel("projections.xlsx", sheet_name="proj 1,5_inter")
-    df.columns = df.columns.str.strip()
+    df, annees = load_proj_15_inter()
+    df_tendance, annees_tendance = load_tendance_1_5()
 
     # Colonnes années
     annees = sorted(
@@ -269,6 +304,9 @@ elif st.session_state.page == "objectif":
         reg = st.multiselect("Régions", regions, default=regions)
         sec = st.multiselect("Secteurs", secteurs, default=[secteurs[0]])
         gaz = st.multiselect("Gaz", gazs, default=[gazs[0]])
+
+        # Bouton affichage tendance
+        afficher_tendance = st.toggle("📈 Afficher la tendance sans action", value=True)
 
         st.markdown("### Paramètres par région")
 
@@ -303,7 +341,7 @@ elif st.session_state.page == "objectif":
         st.stop()
 
     # =============================
-    # FILTRAGE
+    # FILTRAGE 1.5 °C
     # =============================
     df_f = df[
         df["région"].isin(reg) &
@@ -316,6 +354,32 @@ elif st.session_state.page == "objectif":
         st.stop()
 
     # =============================
+    # FILTRAGE TENDANCE
+    # =============================
+    df_tendance_f = df_tendance[
+        df_tendance["région"].isin(reg) &
+        df_tendance["Sector"].isin(sec) &
+        df_tendance["Gas"].isin(gaz)
+    ]
+
+    df_tendance_ag = (
+        df_tendance_f
+        .groupby("région")[annees_tendance]
+        .sum()
+        .reset_index()
+    )
+
+    # =============================
+    # PALETTE DE COULEURS PAR RÉGION
+    # =============================
+    palette = [
+        "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728",
+        "#9467bd", "#8c564b", "#e377c2", "#7f7f7f",
+        "#bcbd22", "#17becf", "#aec7e8", "#ffbb78"
+    ]
+    couleur_par_region = {r: palette[i % len(palette)] for i, r in enumerate(sorted(reg))}
+
+    # =============================
     # GRAPHIQUE
     # =============================
     fig = go.Figure()
@@ -323,6 +387,7 @@ elif st.session_state.page == "objectif":
     for _, row in df_f.iterrows():
 
         region_row = row["région"]
+        couleur = couleur_par_region[region_row]
 
         # --- TCAM 2010-2019
         val_2010 = row["2010"]
@@ -343,7 +408,6 @@ elif st.session_state.page == "objectif":
         valeur = derniere_valeur
         proj_vals = []
 
-        # Paramètres propres à la région
         annee_changement = params_regions[region_row]["annee"]
         nouveau_taux = params_regions[region_row]["taux"]
 
@@ -356,25 +420,40 @@ elif st.session_state.page == "objectif":
             valeur = valeur * (1 + taux)
             proj_vals.append(valeur)
 
-        # Historique
+        # Historique — ligne pleine, même couleur que la projection
         fig.add_trace(go.Scatter(
             x=[int(a) for a in annees],
             y=emissions.values,
             mode="lines",
+            line=dict(color=couleur, width=2),
             name=f"{region_row} | {row['Sector']} | {row['Gas']} (hist)"
         ))
 
-        # Projection
+        # Projection — tirets, même couleur
         fig.add_trace(go.Scatter(
             x=annees_proj,
             y=proj_vals,
             mode="lines",
-            line=dict(dash="dash"),
+            line=dict(color=couleur, width=2, dash="dash"),
             name=f"{region_row} | {row['Sector']} | {row['Gas']} (proj)"
         ))
 
+    # ---------- TENDANCE (conditionnelle) ----------
+    if afficher_tendance:
+        for _, row in df_tendance_ag.iterrows():
+            region_row = row["région"]
+            couleur = couleur_par_region.get(region_row, "#888888")
+
+            fig.add_trace(go.Scatter(
+                x=[int(a) for a in annees_tendance],
+                y=[row[a] for a in annees_tendance],
+                mode="lines",
+                line=dict(color=couleur, width=3, dash="dot"),
+                name=f"{region_row} — tendance"
+            ))
+
     fig.update_layout(
-        title="Projection Objectif 1.5°C — Paramètres personnalisés par région",
+        title="Projection Objectif 1.5°C — Paramètres personnalisés par région vs Tendance sans action",
         xaxis_title="Année",
         yaxis_title="MtCO₂e",
         template="plotly_white",
@@ -384,7 +463,6 @@ elif st.session_state.page == "objectif":
     fig.update_yaxes(rangemode="tozero")
 
     st.plotly_chart(fig, use_container_width=True)
-
 
 
 
@@ -474,8 +552,8 @@ elif st.session_state.page == "leviers":
     # =============================
     # CHARGEMENT DES DONNÉES
     # =============================
-    df_tendance, annees = load_sheet_0()
-    df_objectif, annees_obj = load_sheet_2()
+    df_tendance, annees = load_tendance()
+    df_objectif, annees_obj = load_proj_15()
 
     # =============================
     # FILTRAGE : WORLD + TOTAL INCLUDING LUCF + 4 GAZ
