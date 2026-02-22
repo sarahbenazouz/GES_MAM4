@@ -111,8 +111,10 @@ def load_ndc():
 # =====================================================
 if st.session_state.page == "accueil":
 
-    st.title("🌍 Trajectoires des émissions de GES")
+    st.title("🌍 Trajectoires des émissions de gaz à effet de serre")
     st.markdown("### Choisissez un scénario")
+
+
 
     col1, col2, col3, col4 = st.columns(4)
 
@@ -136,6 +138,41 @@ if st.session_state.page == "accueil":
             st.session_state.page = "leviers"
             st.rerun()
 
+        st.markdown("---")
+
+    st.subheader("📘 À propos de cette application")
+
+    st.markdown("""
+    Cette interface permet d'explorer différentes trajectoires d'émissions
+    de gaz à effet de serre (GES) selon plusieurs scénarios :
+
+    - 📈 Tendance sans action  
+    - 🌡️ Objectif compatible avec 1,5°C  
+    - 📜 Engagements climatiques nationaux (NDC)  
+    - 🧩 Simulation de leviers d'atténuation  
+
+    L'objectif est de comprendre comment les choix politiques
+    influencent les trajectoires climatiques à long terme.
+    """)
+ 
+
+    st.info("""
+    🔎 Pourquoi c’est important ?
+
+    Pour limiter le réchauffement à 1,5°C, les émissions mondiales
+    doivent diminuer rapidement dès cette décennie.
+    Les scénarios permettent d’évaluer si les trajectoires actuelles
+    sont compatibles avec cet objectif.
+    """)
+
+    st.warning("""
+    ❓ Question à explorer :
+
+    Les engagements actuels sont-ils suffisants pour respecter
+    l'objectif 1,5°C ?
+
+    Testez les scénarios pour le découvrir.
+    """)
 
 # =====================================================
 # PAGE 1 : TENDANCE SANS ACTION
@@ -318,18 +355,27 @@ elif st.session_state.page == "objectif":
 
             annee_r = st.slider(
                 f"Année d'application - {r}",
-                2020, 2050, 2030,
+                2020, 2100, 2030,
                 key=f"annee_{r}"
             )
 
             taux_r = st.number_input(
                 f"Taux annuel (%) - {r}",
-                min_value=-20.0,
-                max_value=20.0,
+                min_value=-50.0,
+                max_value=50.0,
                 value=-2.0,
                 step=0.1,
                 key=f"taux_{r}"
             )
+
+            ####message de warning si on chosit un taux>0#####
+            if taux_r > 0:
+                st.warning(f"""
+                ⚠️ Attention : avec un taux positif pour {r},
+                les émissions continueront d'augmenter.
+        
+                Cela n’est pas compatible avec une trajectoire 1,5°C.
+                """)
 
             params_regions[r] = {
                 "annee": annee_r,
@@ -420,6 +466,15 @@ elif st.session_state.page == "objectif":
             valeur = valeur * (1 + taux)
             proj_vals.append(valeur)
 
+        ######msg de prevention sur le fait que si la veleur en 2100>à la valeur d'avant =>pb####
+        if proj_vals[-1] > emissions.iloc[-1]:
+            st.error(f"""
+            🚨 Dans le scénario pour {region_row},
+            les émissions en 2100 sont supérieures au niveau actuel.
+            
+            Ce scénario est incompatible avec une stabilisation climatique.
+            """)
+
         # Historique — ligne pleine, même couleur que la projection
         fig.add_trace(go.Scatter(
             x=[int(a) for a in annees],
@@ -463,6 +518,20 @@ elif st.session_state.page == "objectif":
     fig.update_yaxes(rangemode="tozero")
 
     st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("---")
+
+    with st.expander("ℹ️ Comment est calculée la projection ?"):
+        st.write("""
+        - Le taux de croissance annuel moyen (TCAM) est calculé sur la période 2010-2019.
+        - Un nouveau taux est appliqué à partir de l’année choisie.
+        - Formule utilisée :
+    
+        Emissions(t+1) = Emissions(t) × (1 + taux)
+    
+        ⚠️ Une trajectoire compatible 1,5°C implique une baisse rapide
+        et continue des émissions mondiales.
+        """)
 
 
 
