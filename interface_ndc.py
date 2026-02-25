@@ -607,7 +607,7 @@ elif st.session_state.page == "ndc":
 
 
 # =====================================================
-# PAGE 4 : LEVIERS (COMPARAISON WORLD)
+# PAGE 4 : LEVIERS (COMPARAISON EUROPE)
 # =====================================================
 elif st.session_state.page == "leviers":
 
@@ -616,7 +616,7 @@ elif st.session_state.page == "leviers":
         on_click=lambda: st.session_state.update({"page": "accueil"})
     )
 
-    st.title("🧩 Leviers d'atténuation — comparaison WORLD")
+    st.title("🧩 Leviers d'atténuation — comparaison Union Européenne")
 
     # =============================
     # CHARGEMENT DES DONNÉES
@@ -625,67 +625,178 @@ elif st.session_state.page == "leviers":
     df_objectif, annees_obj = load_proj_15()
 
     # =============================
-    # FILTRAGE : WORLD + TOTAL INCLUDING LUCF + 4 GAZ
+    # FILTRAGE : UE + TOTAL INCLUDING LUCF + 4 GAZ
     # =============================
     
     # Liste des 4 gaz à additionner
     gaz_liste = ["CO2", "CH4", "N2O", "F-Gas"]
     
-    # Filtrer : World + Total including LUCF + les 4 gaz
-    df_world_tendance = df_tendance[
-        (df_tendance["Country"] == "World") &
+    # Filtrer : EEU etWEU + Total including LUCF + les 4 gaz
+    df_europe_tendance = df_tendance[
+        (df_tendance["region"].isin(["UE"])) &
         (df_tendance["Sector"] == "Total including LUCF") &
         (df_tendance["Gas"].isin(gaz_liste))
     ]
 
-    if df_world_tendance.empty:
-        st.error(f"❌ Aucune donnée trouvée pour World / Total including LUCF / {gaz_liste}")
+    if df_europe_tendance.empty:
+        st.error(f"❌ Aucune donnée trouvée pour UE / Total including LUCF / {gaz_liste}")
         st.warning("Veuillez vérifier la structure de vos données.")
         st.stop()
 
     # Afficher les données filtrées pour debug
-    st.write(f"**{len(df_world_tendance)} lignes trouvées** (1 par gaz) :")
-    st.dataframe(df_world_tendance[["Country", "Sector", "Gas"]])
+    st.write(f"**{len(df_europe_tendance)} lignes trouvées** (1 par gaz) :")
+    st.dataframe(df_europe_tendance[["region", "Sector", "Gas"]])
 
     # Somme des 4 gaz pour chaque année
-    emissions_monde = df_world_tendance[annees].sum()
+    emissions_europe = df_europe_tendance[annees].sum()
 
     # =============================
-    # PARAMÈTRES DU LEVIER
+    # PARAMÈTRES DU LEVIER Végétarien
+    # =============================
+    #calcul repas viande est basé sur : 
+    # repas poulet 1,58 kg CO₂e represente 26% des repas à base de protéines animales en Europe
+    # repas boeuf 7,26 kg CO₂e represente 11% des repas à base de protéines animales en Europe
+    # repas porc 2,30 kg CO₂e represente 36% des repas à base de protéines animales en Europe
+    # repas poisson gras = 1,11 kg CO₂e represente 12% des repas à base de protéines animales en Europe
+    # repas poisson blanc = 1,98 kg CO₂erepresente 15% des repas à base de protéines animales en Europe
+    EM_repas_viande = 2.46 # (1,58*0,26 + 7,26*0,11 + 2,30*0,36 + 1,11*0,12 + 1,98*0,15)
+    EM_repas_VG = 0.51 #source ademe 
+    # =============================
+    # CONFIGURATION DE LA SIDEBAR (UNIQUE)
     # =============================
     with st.sidebar:
-        st.header("Paramètres du levier")
-        ANNEE_DEBUT = st.slider("Année de début", 2020, 2030, 2025)
-        ANNEE_FIN = st.slider("Année de fin", 2030, 2050, 2040)
-        REDUCTION_CIBLE = st.slider("Réduction cible (%)", 0, 100, 30) / 100
+        st.header("⚙️ Configuration des Leviers")
 
-    facteurs = []
-    for annee in map(int, annees):
-        if annee < ANNEE_DEBUT:
-            facteurs.append(0)
-        elif annee > ANNEE_FIN:
-            facteurs.append(REDUCTION_CIBLE)
-        else:
-            facteurs.append(
-                REDUCTION_CIBLE *
-                (annee - ANNEE_DEBUT) /
-                (ANNEE_FIN - ANNEE_DEBUT)
+        # --- SECTION ALIMENTATION ---
+        with st.container(border=True):
+            st.subheader("🥦 Alimentation")
+            
+            PART_VG_ACTUELLE = 0.25
+            REPAS_VG_ACTUELS = round(PART_VG_ACTUELLE * 14)
+
+            repas_vg_semaine = st.slider(
+                "Repas végétariens / semaine",
+                min_value=REPAS_VG_ACTUELS, max_value=14, value=REPAS_VG_ACTUELS, step=1
+            )
+            part_vg_cible = repas_vg_semaine / 14
+
+            col_vg1, col_vg2 = st.columns(2)
+            with col_vg1:
+                ANNEE_DEBUT_VG = st.number_input("Début", 2025, 2050, 2025, key="dvg")
+            with col_vg2:
+                ANNEE_FIN_VG = st.number_input("Objectif", 2030, 2100, 2050, key="fvg")
+
+            # Calcul gain Végé
+            NMB_REPAS = 447_000_000 * (0.97 * 2 + 0.03 * 1) * 365
+            delta_repas_vg = (part_vg_cible * NMB_REPAS) - (PART_VG_ACTUELLE * NMB_REPAS)
+            reduction_annuelle_MtCO2 = delta_repas_vg * (EM_repas_viande - EM_repas_VG) / 1e9
+            
+            st.caption(f"📉 Gain partiel : **{reduction_annuelle_MtCO2:.1f} Mt**")
+
+        st.markdown(" ") # Espacement
+
+        # --- SECTION AVION ---
+        with st.container(border=True):
+            st.subheader("✈️ Transport Aérien")
+            st.markdown("*Cible : report modal vers le train*")
+            
+            seuil_km = st.radio(
+                "Distance des vols supprimés",
+                options=["Aucun", "750 km", "1000 km", "1500 km"],
+                horizontal=True
             )
 
-    facteurs = pd.Series(facteurs, index=annees)
-    emissions_avec_levier = emissions_monde * (1 - facteurs)
+            # --- AJOUT DES ORDRES DE GRANDEUR DE DISTANCE ---
+            if seuil_km == "750 km":
+                st.caption("📍 *Ex : Paris ↔ Munich*")
+            elif seuil_km == "1000 km":
+                st.caption("📍 *Ex : Paris ↔ Rome*")
+            elif seuil_km == "1500 km":
+                st.caption("📍 *Ex : Marseille ↔ Berlin*")
+            # -----------------------------------------------
+
+            col_av1, col_av2 = st.columns(2)
+
+            # Data Avion
+            vols_data = {
+                "750 km": [{"nb_billets": 250e6, "dist_moy": 450}],
+                "1000 km": [{"nb_billets": 250e6, "dist_moy": 450}, {"nb_billets": 110e6, "dist_moy": 875}],
+                "1500 km": [{"nb_billets": 250e6, "dist_moy": 450}, {"nb_billets": 110e6, "dist_moy": 875}, {"nb_billets": 140e6, "dist_moy": 1250}]
+            }#source : (Source type Eurostat / Eurocontrol) à verif, la distance moy est un peu au pifometre
+            
+            EF_AVION, EF_TRAIN = 0.258, 0.0025 # kg CO₂e/passager/km
+            GAIN_KM = EF_AVION - EF_TRAIN
+
+            col_av1, col_av2 = st.columns(2)
+            with col_av1:
+                ANNEE_DEBUT_AVION = st.number_input("Début", 2025, 2050, 2025, key="dav")
+            with col_av2:
+                ANNEE_FIN_AVION = st.number_input("Objectif", 2030, 2100, 2040, key="fav")
+
+            # Calcul gain Avion
+            reduction_avion_Mt = 0.0
+            if seuil_km != "Aucun":
+                for tranche in vols_data[seuil_km]:
+                    reduction_avion_Mt += (tranche["nb_billets"] * tranche["dist_moy"] * GAIN_KM) / 1e9
+
+            st.caption(f"📉 Gain partiel : **{reduction_avion_Mt:.1f} Mt**")
+
+        st.markdown("---")
+        
+
+        # --- RÉSULTAT CUMULÉ ---
+        total_reduc = reduction_annuelle_MtCO2 + reduction_avion_Mt
+        st.metric(
+            label="🚀 RÉDUCTION TOTALE CUMULÉE",
+            value=f"{total_reduc:.1f} MtCO₂e/an",
+            delta=f"Impact cible en {max(ANNEE_FIN_VG, ANNEE_FIN_AVION)}",
+            delta_color="off"
+        )
+        # --- SECTION ORDRES DE GRANDEUR ---
+        with st.expander("📊 Ordres de grandeur (Émissions/an)"):
+            st.markdown(f"""
+            Pour comparer vos **{total_reduc:.1f} Mt** de réduction aux émissions annuelles de certains pays en 2022 :
+            
+            1. 🇸🇪 **~34 Mt** : Suède
+            2. 🇦🇹 **~64 Mt** : Autriche
+            3. 🇧🇪 **~97 Mt** : Belgique 
+            4. 🇪🇸 **~274 Mt** : Espagne
+            5. 🇫🇷 **~332 Mt** : France
+            6. 🇮🇹 **~384 Mt** : Italie
+            7. 🇩🇪 **~695 Mt** : Allemagne
+            
+            *Note : Chiffres arrondis (MtCO₂e) basés sur la base de ClimateWatch.*
+            """)
+
+    # =============================
+    # CALCUL DE LA TRAJECTOIRE (Reste inchangé mais vérifie les variables)
+    # =============================
+    emissions_avec_levier = emissions_europe.copy()
+    for annee in annees:
+        a = int(annee)
+        # Facteur VG
+        if a < ANNEE_DEBUT_VG: f_vg = 0.0
+        elif a >= ANNEE_FIN_VG: f_vg = 1.0
+        else: f_vg = (a - ANNEE_DEBUT_VG) / (ANNEE_FIN_VG - ANNEE_DEBUT_VG)
+        # Facteur Avion
+        if a < ANNEE_DEBUT_AVION: f_av = 0.0
+        elif a >= ANNEE_FIN_AVION: f_av = 1.0
+        else: f_av = (a - ANNEE_DEBUT_AVION) / (ANNEE_FIN_AVION - ANNEE_DEBUT_AVION)
+
+        reduc_totale = (f_vg * reduction_annuelle_MtCO2) + (f_av * reduction_avion_Mt)
+        emissions_avec_levier[annee] = emissions_europe[annee] - reduc_totale
 
     # =============================
     # OBJECTIF 1,5 °C — WORLD
     # =============================
-    df_world_obj = df_objectif[df_objectif["Country"].str.upper() == "WORLD"]
+    df_europe_obj = df_objectif[df_objectif["région"].isin(["UE"])]
 
-    if df_world_obj.empty:
-        st.warning("⚠️ Ligne 'WORLD' introuvable dans les données objectif 1,5 °C.")
+    if df_europe_obj.empty:
+        st.warning("⚠️ Ligne 'EUROPE' introuvable dans les données objectif 1,5 °C.")
         st.info("Le graphique affichera uniquement la tendance et le levier.")
         objectif_monde = None
     else:
-        objectif_monde = df_world_obj[annees_obj].iloc[0]
+        objectif_monde = df_europe_obj[annees_obj].iloc[0]
 
     # =============================
     # GRAPHIQUE
@@ -694,9 +805,9 @@ elif st.session_state.page == "leviers":
 
     fig.add_trace(go.Scatter(
         x=[int(a) for a in annees],
-        y=emissions_monde.values,
+        y=emissions_europe.values,
         mode="lines",
-        name="WORLD — sans action (tendance)",
+        name="EUROPE — sans action (tendance)",
         line=dict(width=4, color="red")
     ))
 
@@ -704,7 +815,7 @@ elif st.session_state.page == "leviers":
         x=[int(a) for a in annees],
         y=emissions_avec_levier.values,
         mode="lines",
-        name=f"WORLD — avec levier (-{int(REDUCTION_CIBLE*100)}% en {ANNEE_FIN})",
+        name="Europe — avec leviers cumulés",
         line=dict(width=4, dash="dash", color="orange")
     ))
 
@@ -713,12 +824,12 @@ elif st.session_state.page == "leviers":
             x=[int(a) for a in annees_obj],
             y=objectif_monde.values,
             mode="lines",
-            name="Objectif 1,5 °C — WORLD",
+            name="Objectif 1,5 °C — Europe",
             line=dict(width=5, color="green")
         ))
 
     fig.update_layout(
-        title="Comparaison WORLD — levier vs objectif 1,5 °C",
+        title="Comparaison Europe — levier vs objectif 1,5 °C",
         xaxis_title="Année",
         yaxis_title="MtCO₂e",
         template="plotly_white",
@@ -733,23 +844,26 @@ elif st.session_state.page == "leviers":
     with st.expander("ℹ️ Détails du calcul"):
         st.write(f"""
         **Données utilisées :**
-        - Région : WORLD
+        - Région : Euurope
         - Catégorie : Total including LUCF
         - Gaz additionnés : {', '.join(gaz_liste)}
         
         **Levier appliqué :**
-        - Réduction progressive de {ANNEE_DEBUT} à {ANNEE_FIN}
-        - Réduction cible : {REDUCTION_CIBLE*100:.0f}% en {ANNEE_FIN}
+        - Réduction progressive de {ANNEE_DEBUT_VG} à {ANNEE_FIN_VG}
+        - Part végétarienne cible : {part_vg_cible*100:.0f}% en {ANNEE_FIN_VG}
         
-        **Émissions totales en 2025 :** {emissions_monde.loc['2025']:.2f} MtCO₂e
-        **Émissions avec levier en 2040 :** {emissions_avec_levier.loc['2040']:.2f} MtCO₂e
+        **Émissions totales en 2025 :** {emissions_europe.loc['2025']:.2f} MtCO₂e
+        **Émissions avec levier en 2040 :** {emissions_avec_levier.get('2040', float('nan')):.2f} MtCO₂e
+        - **Aérien** : Report modal sur le train pour vols < {seuil_km} (Gain max : {reduction_avion_Mt:.1f} Mt).
+        
+        **Impact total à terme** : -{reduction_annuelle_MtCO2 + reduction_avion_Mt:.1f} MtCO₂e/an.
         """)
     
     with st.expander("📊 Données détaillées par gaz"):
         # Créer un tableau récapitulatif par gaz
         recap_gaz = []
         for gaz in gaz_liste:
-            ligne_gaz = df_world_tendance[df_world_tendance["Gas"] == gaz]
+            ligne_gaz = df_europe_tendance[df_europe_tendance["Gas"] == gaz]
             if not ligne_gaz.empty:
                 recap_gaz.append({
                     "Gaz": gaz,
