@@ -535,7 +535,6 @@ elif st.session_state.page == "objectif":
 
 
 
-
 # =====================================================
 # PAGE 3 : NDC
 # =====================================================
@@ -549,6 +548,15 @@ elif st.session_state.page == "ndc":
     st.title("📜 Trajectoires des émissions — NDC")
 
     df, annees = load_ndc()
+
+    # Limiter à 2050
+    annees = [a for a in annees if int(a) <= 2050]
+
+    # Renommer la substance
+    df["Substance"] = df["Substance"].replace("GWP_100_AR5_CH4", "CH4")
+    df["Substance"] = df["Substance"].replace("GWP_100_AR5_N2O", "N2O")
+    df["Substance"] = df["Substance"].replace("GWP_100_AR5_F-gases", "F-Gas")
+
 
     regions = sorted(df["Region TIAM"].dropna().unique())
     substances = sorted(df["Substance"].dropna().unique())
@@ -643,16 +651,13 @@ elif st.session_state.page == "leviers":
         st.warning("Veuillez vérifier la structure de vos données.")
         st.stop()
 
-    # Afficher les données filtrées pour debug
-    st.write(f"**{len(df_europe_tendance)} lignes trouvées** (1 par gaz) :")
-    st.dataframe(df_europe_tendance[["region", "Sector", "Gas"]])
 
     # Somme des 4 gaz pour chaque année
     emissions_europe = df_europe_tendance[annees].sum()
 
     # =============================
     # PARAMÈTRES DU LEVIER Végétarien
-    # =============================
+    # ============================= 
     #calcul repas viande est basé sur : 
     # repas poulet 1,58 kg CO₂e represente 26% des repas à base de protéines animales en Europe
     # repas boeuf 7,26 kg CO₂e represente 11% des repas à base de protéines animales en Europe
@@ -671,9 +676,10 @@ elif st.session_state.page == "leviers":
         with st.container(border=True):
             st.subheader("🥦 Alimentation")
             
-            PART_VG_ACTUELLE = 0.25
+            PART_VG_ACTUELLE = 0.25 #source CBS Pays-Bas 2024: 1.8 repas semaine sur 7 sont végétariens, soit 25% des repas
             REPAS_VG_ACTUELS = round(PART_VG_ACTUELLE * 14)
 
+            #L'utilisateur choisit un nombre de repas, on le reconvertit en proportion : 8/14 = 57%
             repas_vg_semaine = st.slider(
                 "Repas végétariens / semaine",
                 min_value=REPAS_VG_ACTUELS, max_value=14, value=REPAS_VG_ACTUELS, step=1
@@ -687,7 +693,7 @@ elif st.session_state.page == "leviers":
                 ANNEE_FIN_VG = st.number_input("Objectif", 2030, 2100, 2050, key="fvg")
 
             # Calcul gain Végé
-            NMB_REPAS = 447_000_000 * (0.97 * 2 + 0.03 * 1) * 365
+            NMB_REPAS = 447_000_000 * (0.99 * 2 + 0.01 * 1) * 365 # population UE 447M, 2 repas/jour pour 99% de la population, 1 repas/jour pour 1%, 365 jours/an
             delta_repas_vg = (part_vg_cible * NMB_REPAS) - (PART_VG_ACTUELLE * NMB_REPAS)
             reduction_annuelle_MtCO2 = delta_repas_vg * (EM_repas_viande - EM_repas_VG) / 1e9
             
@@ -708,11 +714,11 @@ elif st.session_state.page == "leviers":
 
             # --- AJOUT DES ORDRES DE GRANDEUR DE DISTANCE ---
             if seuil_km == "750 km":
-                st.caption("📍 *Ex : Paris ↔ Munich*")
+                st.caption("📍 *Ex : Nice ↔ Nantes*")
             elif seuil_km == "1000 km":
-                st.caption("📍 *Ex : Paris ↔ Rome*")
+                st.caption("📍 *Ex : Paris ↔ Madrid*")
             elif seuil_km == "1500 km":
-                st.caption("📍 *Ex : Marseille ↔ Berlin*")
+                st.caption("📍 *Ex : Londres ↔ Rome*")
             # -----------------------------------------------
 
             col_av1, col_av2 = st.columns(2)
@@ -787,7 +793,7 @@ elif st.session_state.page == "leviers":
         emissions_avec_levier[annee] = emissions_europe[annee] - reduc_totale
 
     # =============================
-    # OBJECTIF 1,5 °C — WORLD
+    # OBJECTIF 1,5 °C — UE
     # =============================
     df_europe_obj = df_objectif[df_objectif["région"].isin(["UE"])]
 
