@@ -187,6 +187,19 @@ elif st.session_state.page == "tendance":
 
     st.title("📈 Tendance des émissions — Sans action")
 
+    st.info("""
+    **Comment lire ce graphique**
+
+    Ce scénario représente l'évolution des émissions **si aucune nouvelle politique climatique n'est mise en place**.
+
+    Utilisez les filtres à gauche pour explorer :
+    - différentes **régions**
+    - différents **secteurs**
+    - différents **gaz**
+
+    
+    """)
+
     df, annees = load_tendance()
 
     regions = sorted(df["region"].dropna().unique())
@@ -302,6 +315,21 @@ elif st.session_state.page == "tendance":
 
     st.plotly_chart(fig, use_container_width=True)
 
+    # =============================
+    # INDICATEUR CLÉ
+    # =============================
+
+    emissions_debut = df_ag[annees[0]].sum()
+    emissions_fin = df_ag[annees[-1]].sum()
+
+    variation = (emissions_fin - emissions_debut) / emissions_debut * 100
+
+    st.metric(
+        label=f"Émissions totales en {annees[-1]}",
+        value=f"{emissions_fin:.0f} MtCO₂e",
+        delta=f"{variation:.1f}% depuis {annees[0]}"
+    )
+
 
 
 # =====================================================
@@ -317,6 +345,18 @@ elif st.session_state.page == "objectif":
     )
 
     st.title("🌡️ Objectif 1.5°C - vs Tendance sans action")
+
+    st.success("""
+    🎯 Mission climat
+
+    Essayez de construire une trajectoire compatible avec **l'objectif 1,5°C**.
+
+    Pour chaque région vous pouvez modifier :
+    - l'année à partir de laquelle les politiques climatiques s'appliquent
+    - le taux annuel de réduction des émissions
+
+    👉 Testez différents paramètres et observez si les émissions diminuent suffisamment.
+    """)
 
     # ---- Chargement des données
     df, annees = load_proj_15_inter()
