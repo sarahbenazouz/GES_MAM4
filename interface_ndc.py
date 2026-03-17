@@ -770,7 +770,7 @@ elif st.session_state.page == "leviers":
                 "1500 km": [{"nb_billets": 250e6, "dist_moy": 450}, {"nb_billets": 110e6, "dist_moy": 875}, {"nb_billets": 140e6, "dist_moy": 1250}]
             }#données à affiner
             
-            EF_AVION, EF_TRAIN = 0.258, 0.0025 # kg CO₂e/passager/km
+            EF_AVION, EF_TRAIN = 0.238, 0.012 # kg CO₂e/passager/km
             GAIN_KM = EF_AVION - EF_TRAIN
 
             col_av1, col_av2 = st.columns(2)
