@@ -768,7 +768,7 @@ elif st.session_state.page == "leviers":
                 "750 km": [{"nb_billets": 250e6, "dist_moy": 450}],
                 "1000 km": [{"nb_billets": 250e6, "dist_moy": 450}, {"nb_billets": 110e6, "dist_moy": 875}],
                 "1500 km": [{"nb_billets": 250e6, "dist_moy": 450}, {"nb_billets": 110e6, "dist_moy": 875}, {"nb_billets": 140e6, "dist_moy": 1250}]
-            }#source : (Source type Eurostat / Eurocontrol) à verif, la distance moy est un peu au pifometre
+            }#données à affiner
             
             EF_AVION, EF_TRAIN = 0.258, 0.0025 # kg CO₂e/passager/km
             GAIN_KM = EF_AVION - EF_TRAIN
@@ -815,7 +815,7 @@ elif st.session_state.page == "leviers":
             """)
 
     # =============================
-    # CALCUL DE LA TRAJECTOIRE (Reste inchangé mais vérifie les variables)
+    # CALCUL DE LA TRAJECTOIRE
     # =============================
     emissions_avec_levier = emissions_europe.copy()
     for annee in annees:
@@ -838,7 +838,7 @@ elif st.session_state.page == "leviers":
     df_europe_obj = df_objectif[df_objectif["région"].isin(["UE"])]
 
     if df_europe_obj.empty:
-        st.warning("⚠️ Ligne 'EUROPE' introuvable dans les données objectif 1,5 °C.")
+        st.warning(" Ligne 'EUROPE' introuvable dans les données objectif 1,5 °C.")
         st.info("Le graphique affichera uniquement la tendance et le levier.")
         objectif_monde = None
     else:
