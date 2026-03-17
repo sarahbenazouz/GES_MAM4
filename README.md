@@ -135,18 +135,20 @@ La structure est en place, mais **les données sont à considérer comme des est
 
 | Mode | kg CO₂e/passager/km | Statut |
 |------|---------------------|--------|
-| Avion | 0,258 | ⚠️ À consolider |
-| Train | 0,0025 | ⚠️ À consolider |
+| Avion | 0,230 | ⚠️ À consolider |
+| Train | 0,012 | ⚠️ À consolider |
+
+source: sncf et ademe
 
 ### Tranches de vols
 
 | Seuil | Billets | Distance moyenne | Statut |
 |-------|---------|-----------------|--------|
-| ≤ 750 km | 250M | 450 km | ⚠️ À vérifier |
-| ≤ 1 000 km | 250M + 110M | 450 / 875 km | ⚠️ À vérifier |
-| ≤ 1 500 km | 250M + 110M + 140M | 450 / 875 / 1 250 km | ⚠️ À vérifier |
+| ≤ 750 km | 250M | 450 km | ⚠️ À consolider |
+| ≤ 1 000 km | 250M + 110M | 450 / 875 km | ⚠️ À consolider |
+| ≤ 1 500 km | 250M + 110M + 140M | 450 / 875 / 1 250 km | ⚠️ À consolider |
 
-> Sources indicatives : Eurostat / Eurocontrol — **non vérifiées à ce stade**
+
 
 ### Formule appliquée
 ```math
