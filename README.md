@@ -124,7 +124,40 @@ Baseline : 25 % de repas végétariens (CBS Pays-Bas, 2023).
 ```
 ΔE = (pVG_cible − pVG_actuel) × Nrepas × (EM_viande − EM_VG) / 10⁹
 ```
+** Avion **
 
+## ⚠️ Levier report modal avion-train — Données provisoires
+
+Ce levier est une **démonstration fonctionnelle** de la logique de calcul du site.
+La structure est en place, mais **les données sont à considérer comme des estimations approximatives** et ne doivent pas être utilisées pour tirer des conclusions sans révision préalable.
+
+### Facteurs d'émission utilisés
+
+| Mode | kg CO₂e/passager/km | Statut |
+|------|---------------------|--------|
+| Avion | 0,258 | ⚠️ À consolider |
+| Train | 0,0025 | ⚠️ À consolider |
+
+### Tranches de vols
+
+| Seuil | Billets | Distance moyenne | Statut |
+|-------|---------|-----------------|--------|
+| ≤ 750 km | 250M | 450 km | ⚠️ À vérifier |
+| ≤ 1 000 km | 250M + 110M | 450 / 875 km | ⚠️ À vérifier |
+| ≤ 1 500 km | 250M + 110M + 140M | 450 / 875 / 1 250 km | ⚠️ À vérifier |
+
+> Sources indicatives : Eurostat / Eurocontrol — **non vérifiées à ce stade**
+
+### Formule appliquée
+```math
+ΔE = Σ (Nᵢ × dᵢ × (EF_avion - EF_train)) / 10⁹  [MtCO₂e]
+```
+
+### 🔧 Ce qui reste à faire
+- Vérifier et sourcer les facteurs d'émission (avion et train)
+- Consolider les volumes de billets par tranche de distance (Eurostat / Eurocontrol)
+- Affiner les distances moyennes par tranche
+- Valider la segmentation des tranches de distance
 ##  Fonctionnalités de l'interface
 
 - Navigation multi-pages (accueil + 4 modules)
