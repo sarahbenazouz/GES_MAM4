@@ -21,7 +21,7 @@ Cet outil propose quatre modules principaux :
 ##  Structure du projet
 
 ```
-├── interface_ndc.py       # Application principale Streamlit
+├── interface.py       # Application principale Streamlit
 ├── projections.xlsx       # Données sources (Climate Watch)
 │   ├── tendance           # Données de projection tendancielle
 │   ├── proj 1,5           # Trajectoire objectif 1,5 °C
@@ -54,7 +54,7 @@ streamlit run interface_ndc.py
 
 L'application s'ouvre automatiquement dans le navigateur à l'adresse `http://localhost:8501`.
 
->  Le fichier `projections.xlsx` doit se trouver dans le même répertoire que `interface_ndc.py`.
+>  Le fichier `projections.xlsx` doit se trouver dans le même répertoire que `interface.py`.
 
 ---
 
